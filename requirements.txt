@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+pytest
+httpx
+SQLAlchemy>=2.0,<3.0

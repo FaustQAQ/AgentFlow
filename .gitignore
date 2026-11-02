@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.pytest_cache/
+.coverage
+data/
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+.vite/
+frontend/.vite/
+*.log
+.DS_Store
