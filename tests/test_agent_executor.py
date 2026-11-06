@@ -429,7 +429,7 @@ def test_sales_tools_pass_data_through_complete_pipeline() -> None:
         [
             ToolCallRequest(
                 tool_name="sales_data_query",
-                arguments={"start_date": "2024-01-01", "end_date": "2024-01-03"},
+                arguments={"dataset_id": 1, "start_date": "2024-01-01", "end_date": "2024-01-03"},
             ),
             ToolCallRequest(
                 tool_name="sales_metrics_calculator",

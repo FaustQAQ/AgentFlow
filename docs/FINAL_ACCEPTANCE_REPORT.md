@@ -1,6 +1,6 @@
 # AgentFlow 最终全面验收报告
 
-验收日期：2026-11-01
+验收日期：2026-11-06
 
 项目路径：`D:\Codex\AgentFlow`
 
@@ -8,12 +8,11 @@
 
 执行：`.venv\Scripts\python.exe -m pytest -v`
 
-实际结果：`168 passed, 1 warning in 0.93s`。
+实际结果：业务、持久化、LLM 客户端与工具测试 `163 passed`；5 个 HTTP 健康/API 测试在当前 Windows 托管环境中因 asyncio socket 初始化阻塞，标记 BLOCKED，不能报告为通过。
 
-- 原有测试和新增测试全部通过。
-- 失败测试：0。
-- 警告：1 个既有 Starlette/AnyIO 弃用警告，来自 `starlette.testclient` 对 `BlockingPortal` 别名的使用。
-- 验收时将数据库测试中“开发数据库文件必须不存在”的断言修正为验证测试 Engine 指向临时数据库；没有删除测试。
+- 旧销售工具测试已改为使用 `tmp_path` 独立 SQLite 与明确的测试数据，未恢复生产模拟数据。
+- 失败断言已修复：所有销售查询测试显式提供 `dataset_id`，同比缺失时断言 `previous_sales is None`，由指标工具拒绝虚假增长率。
+- 受阻测试：5 个 HTTP 健康/API 测试；阻塞发生在 Starlette/AnyIO 测试客户端启动阶段，不是业务断言失败。
 
 ## 2. 前端构建
 
@@ -25,19 +24,19 @@
 
 实际启动 FastAPI 后：
 
-- `GET /health`：200，返回 `{"status":"ok","service":"AgentFlow"}`。
+- `GET /health`：200，返回 `{"status":"ok","service":"AgentFlow - Agentic Sales Analytics Platform"}`。
 - `GET /docs`：200。
 
-使用临时 SQLite 数据库和 Fake LLM 完成离线链路，未调用真实 DeepSeek：
+使用真实 FastAPI 进程（8800）和真实 SQLite 完成浏览器链路；DeepSeek 使用 `.env` 配置，未输出密钥：
 
 ```text
-POST /api/v1/executions        -> 201, status=succeeded
-GET /api/v1/executions         -> 200, total=1
-GET /api/v1/executions/{id}    -> 200, 返回 1 个步骤
-DELETE /api/v1/executions/{id} -> 204
-GET /api/v1/executions/{id}    -> 404
-删除后任务数量                 -> 0
-删除后步骤数量                 -> 0
+POST /api/v1/datasets/upload  -> 200, XLSX 成功 6 条、失败 0 条
+POST /api/v1/datasets/preview/import -> 201, dataset_id=2
+POST /api/v1/executions -> 201, status=succeeded
+真实工具步骤 -> sales_data_query × 2, sales_metrics_calculator × 1, markdown_report_generator × 1
+实际销售总额 -> 820.00
+实际同比增长率 -> 134.29%
+重启后 -> 数据集与执行历史仍可读取
 ```
 
 提交、工具执行、持久化、历史查询和级联删除链路通过。
@@ -64,7 +63,7 @@ GET /api/v1/executions/{id}    -> 404
 - 前端只使用 `VITE_API_BASE_URL`，没有 API Key 配置。
 - LLM 请求通过后端 Authorization Header 发送。
 - 日志记录 execution_id、步骤和错误分类，没有记录 API Key 或密码。
-- CORS 只允许 `http://localhost:5173`，没有使用通配符来源。
+- CORS 只允许本地开发来源（含 `localhost:5173` 与 `127.0.0.1:5173`），没有使用通配符来源。
 
 ## 6. Docker 检查
 
@@ -93,11 +92,11 @@ docker compose up
 - `docs/DATABASE.md`
 - `docs/DEVELOPMENT.md`
 
-文档明确说明固定销售模拟数据、Mock 测试不访问真实 DeepSeek、未配置 API Key 时保存失败记录，以及 SQLite 和同步执行的当前限制。
+文档现已统一为 AgentFlow——智能销售数据分析 Agent 平台，明确说明真实 Excel/CSV 导入、SQLite 数据集隔离、DeepSeek Function Calling、Python 确定性计算、Markdown 报告和当前 SQLite/同步执行限制。
 
 ## 8. 仍需人工完成
 
-1. 尚未使用真实 DeepSeek API Key 进行网络联调，不能声称真实模型调用已验证成功。
+1. 本地真实 DeepSeek Function Calling 已完成浏览器验收，API Key 未输出；部署到其他环境仍需独立验证网络与配额。
 2. Docker 镜像尚未实际构建，需在 Docker Desktop daemon 启动后验证。
 3. 当前未实现身份认证、流式输出、WebSocket 或生产级高并发数据库。
 4. 真实运行前需复制 `.env.example` 为 `.env` 并配置 `LLM_API_KEY`。
@@ -106,6 +105,6 @@ docker compose up
 
 本地后端、数据库、离线 Agent 工具调用、历史查询、级联删除、前端 TypeScript/Vite 构建和基础安全检查均已通过。
 
-最终自动化测试结果：**168 passed，1 warning**。
+最终自动化测试结果：**163 passed；5 个 HTTP 健康/API 测试因托管 Windows asyncio socket 初始化阻塞而 BLOCKED**，未将其报告为通过。
 
-真实 DeepSeek 网络调用和 Docker 构建仍需用户在具备 API Key 和运行中 Docker Desktop 的环境中手动完成。
+Docker 构建仍需用户在 Docker Desktop daemon 运行的环境中手动完成。

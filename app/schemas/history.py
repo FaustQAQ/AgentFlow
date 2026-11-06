@@ -26,6 +26,7 @@ class ExecutionResponse(BaseModel):
 
     execution_id: str
     user_request: str
+    dataset_id: int | None = None
     status: str
     final_output: str | None = None
     error_message: str | None = None

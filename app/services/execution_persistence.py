@@ -12,6 +12,7 @@ class ExecutionPersistenceService:
         execution_model = AgentExecutionModel(
             execution_id=execution_id,
             user_request=execution.user_request,
+            dataset_id=execution.dataset_id,
             status=execution.status.value,
             final_output=execution.final_output,
             error_message=execution.error_message,

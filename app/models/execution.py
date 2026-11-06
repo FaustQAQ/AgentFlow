@@ -17,6 +17,7 @@ class AgentExecutionModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     execution_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
     user_request: Mapped[str] = mapped_column(Text, nullable=False)
+    dataset_id: Mapped[int | None] = mapped_column(ForeignKey("sales_datasets.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     final_output: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

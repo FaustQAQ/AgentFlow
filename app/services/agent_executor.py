@@ -162,9 +162,13 @@ class AgentExecutor:
         self,
         user_request: str,
         tool_calls: list[ToolCallRequest],
+        dataset_id: int | None = None,
     ) -> AgentExecution:
         execution = AgentExecution(user_request=user_request)
         context = ExecutionContext()
+        if dataset_id is not None:
+            for call in tool_calls:
+                call.arguments.setdefault("dataset_id", dataset_id)
         execution.started_at = _utc_now()
         logger.info(
             "execution_started execution_id=%s tool_count=%s",

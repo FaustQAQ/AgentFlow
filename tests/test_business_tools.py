@@ -13,7 +13,7 @@ from app.tools.sales_metrics import SalesMetricsArguments, SalesMetricsCalculato
 def test_sales_data_query_returns_current_and_previous_sales() -> None:
     tool = SalesDataQueryTool()
     arguments = tool.validate_arguments(
-        {"start_date": "2024-01-01", "end_date": "2024-01-03"}
+        {"dataset_id": 1, "start_date": "2024-01-01", "end_date": "2024-01-03"}
     )
 
     result = tool.execute(arguments)
@@ -26,13 +26,13 @@ def test_sales_data_query_returns_current_and_previous_sales() -> None:
 def test_sales_data_query_rejects_invalid_date_range() -> None:
     with pytest.raises(ValidationError, match="end_date cannot be earlier"):
         SalesDataQueryTool().validate_arguments(
-            {"start_date": "2024-01-03", "end_date": "2024-01-01"}
+            {"dataset_id": 1, "start_date": "2024-01-03", "end_date": "2024-01-01"}
         )
 
 
 def test_sales_data_query_is_deterministic() -> None:
     tool = SalesDataQueryTool()
-    raw_arguments = {"start_date": date(2024, 1, 1), "end_date": date(2024, 1, 3)}
+    raw_arguments = {"dataset_id": 1, "start_date": date(2024, 1, 1), "end_date": date(2024, 1, 3)}
 
     first = tool.execute(tool.validate_arguments(raw_arguments))
     second = tool.execute(tool.validate_arguments(raw_arguments))
@@ -42,29 +42,27 @@ def test_sales_data_query_is_deterministic() -> None:
 
 def test_sales_data_query_fails_when_current_range_has_no_records() -> None:
     result = SalesDataQueryTool().execute(
-        SalesDataQueryArguments(start_date=date(2025, 1, 1), end_date=date(2025, 1, 3))
+        SalesDataQueryArguments(dataset_id=1, start_date=date(2025, 1, 1), end_date=date(2025, 1, 3))
     )
 
     assert result.success is False
     assert result.error_message is not None
-    assert "current date range" in result.error_message
-    assert "2025-01-01 to 2025-01-03" in result.error_message
+    assert "没有销售记录" in result.error_message
 
 
 def test_sales_data_query_fails_when_previous_range_has_no_records() -> None:
     result = SalesDataQueryTool().execute(
-        SalesDataQueryArguments(start_date=date(2023, 1, 1), end_date=date(2023, 1, 4))
+        SalesDataQueryArguments(dataset_id=1, start_date=date(2023, 1, 1), end_date=date(2023, 1, 4))
     )
 
-    assert result.success is False
-    assert result.error_message is not None
-    assert "previous-year date range" in result.error_message
-    assert "2022-01-01 to 2022-01-04" in result.error_message
+    assert result.success is True
+    assert result.output_data["previous_sales"] is None
+    assert result.output_data["previous_record_count"] == 0
 
 
 def test_sales_data_query_preserves_real_zero_sales_records() -> None:
     result = SalesDataQueryTool().execute(
-        SalesDataQueryArguments(start_date=date(2024, 1, 5), end_date=date(2024, 1, 5))
+        SalesDataQueryArguments(dataset_id=1, start_date=date(2024, 1, 5), end_date=date(2024, 1, 5))
     )
 
     assert result.success is True
@@ -104,7 +102,7 @@ def test_sales_metrics_returns_failure_when_previous_sales_is_zero() -> None:
 
     assert result.success is False
     assert result.error_message is not None
-    assert "previous_sales is zero" in result.error_message
+    assert "上期销售额为零" in result.error_message
 
 
 def test_sales_metrics_rejects_negative_sales() -> None:
@@ -166,7 +164,7 @@ def test_markdown_report_expresses_zero_growth() -> None:
     [
         (
             SalesDataQueryTool(),
-            {"start_date": "2024-01-01", "end_date": "2024-01-01"},
+                {"dataset_id": 1, "start_date": "2024-01-01", "end_date": "2024-01-01"},
         ),
         (SalesMetricsCalculatorTool(), {"current_sales": 10.0, "previous_sales": 5.0}),
         (

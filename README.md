@@ -1,85 +1,120 @@
-# AgentFlow
+# AgentFlow — Agentic Sales Analytics Platform
 
-AgentFlow 是一个本地、可观测的单 Agent 销售分析应用：DeepSeek 负责选择已注册工具，Python 后端负责参数校验和执行，SQLite 保存完整执行历史，React 展示结果。
+**AgentFlow——智能销售数据分析 Agent 平台** is an observable, tool-driven sales analytics application. It connects real Excel/CSV sales data to a DeepSeek-powered Agent that selects registered tools, while Python owns validation, deterministic calculations, persistence, and report generation.
 
-## 已实现能力
+> GitHub Repository: [FaustQAQ/AgentFlow-Sales-Analytics](https://github.com/FaustQAQ/AgentFlow-Sales-Analytics)
 
-- FastAPI 健康检查与执行 API。
-- Pydantic 参数模型、工具注册表和三个确定性销售分析工具。
-- 最大步骤数、有限重试、超时异常、错误分类和执行日志。
-- SQLite + SQLAlchemy 2.x 执行记录、步骤记录、事务保存、历史查询和级联删除。
-- OpenAI 兼容的 DeepSeek Chat Completions 客户端和多轮 Tool Calling Orchestrator。
-- React + TypeScript 前端，可提交任务、查看步骤和浏览历史。
+## What it does
 
-当前销售数据是代码内固定的模拟数据，不代表真实企业数据。真实 DeepSeek 调用需要用户自行配置 API Key；自动化测试不访问真实 API。
+- Uploads `.xlsx` and `.csv` sales files with preview, field mapping, row-level validation, duplicate detection, formula-injection protection, and import statistics.
+- Persists datasets and sales records in SQLite using transactional, additive schema migration.
+- Requires an explicit `dataset_id` throughout the Agent execution lifecycle, preventing cross-dataset analysis.
+- Uses DeepSeek OpenAI-compatible Function Calling to select `sales_data_query`, `sales_metrics_calculator`, and `markdown_report_generator`.
+- Calculates totals, YoY/MoM growth, product rankings, and regional rankings in Python/SQLAlchemy rather than relying on LLM arithmetic.
+- Stores execution history, tool arguments, outputs, errors, and final Markdown reports for auditability.
 
-## 架构
-
-```text
-React/Vite -> FastAPI API -> AgentOrchestrator -> DeepSeek
-                                |                    |
-                                v                    v
-                         AgentExecutor <- ToolRegistry
-                                |
-                                v
-                    ExecutionPersistenceService -> SQLite
-```
-
-## 目录
+## Real business flow
 
 ```text
-app/api/v1/       FastAPI 路由
-app/db/           Engine、SessionLocal、get_db
-app/models/       SQLAlchemy ORM
-app/schemas/      Pydantic 模型
-app/services/     执行、LLM、查询和持久化服务
-app/tools/        工具基类、注册表和销售工具
-frontend/         React + TypeScript + Vite
-tests/            后端自动化测试
-docs/             架构、API、数据库和开发文档
+Excel / CSV upload
+        ↓
+Preview + header mapping + row validation
+        ↓
+Atomic SQLite persistence
+        ↓
+Dataset selected in AgentFlow UI
+        ↓
+DeepSeek Function Calling
+        ↓
+sales_data_query → sales_metrics_calculator → markdown_report_generator
+        ↓
+Traceable Markdown report with source dataset, date range, and record count
 ```
 
-## 本地启动
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[React + TypeScript + Vite] --> API[FastAPI REST API]
+    API --> Import[Sales Import Service]
+    Import --> DB[(SQLite<br/>Datasets + Sales Records)]
+    API --> Orch[AgentOrchestrator]
+    Orch <--> DS[DeepSeek<br/>OpenAI-compatible API]
+    Orch --> Exec[AgentExecutor]
+    Exec --> Registry[ToolRegistry]
+    Registry --> Query[sales_data_query<br/>SQLAlchemy]
+    Registry --> Metrics[sales_metrics_calculator<br/>Python deterministic math]
+    Registry --> Report[markdown_report_generator]
+    Query --> DB
+    API --> History[(Execution History)]
+```
+
+## Technical highlights
+
+- FastAPI, Pydantic v2, SQLAlchemy 2.x, SQLite, React, TypeScript, Vite.
+- Bounded multi-round Agent orchestration with Function Calling, execution context, retries, error classification, and step persistence.
+- Additive database migration: existing SQLite data and execution history are preserved; dataset deletion cascades only to sales records and sets execution `dataset_id` to `NULL`.
+- CSV/XLSX ingestion through `python-multipart` and `openpyxl`; unsupported formats, empty files, invalid dates/amounts, duplicate orders, and bad rows are reported explicitly.
+- API keys stay in the backend `.env`; they are never sent to the frontend or written to logs.
+
+## Project layout
+
+```text
+app/api/v1/       FastAPI dataset and execution routes
+app/models/       SQLAlchemy execution, dataset, and sales-record models
+app/services/     Import, Agent orchestration, LLM, persistence, and query services
+app/tools/        Tool base class, registry, and sales analytics tools
+frontend/         React + TypeScript + Vite application
+tests/            Isolated SQLite and Agent/LLM test suite
+docs/             Architecture, API, database, acceptance, learning log, and interview notes
+testdata/         Clearly labelled local acceptance workbook
+```
+
+## Running locally
 
 ```powershell
 Copy-Item .env.example .env
-# 编辑 .env，填写 LLM_API_KEY
+# Set LLM_API_KEY in .env; never commit .env.
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8800 --reload
 ```
 
-前端：
+In another terminal:
 
 ```powershell
 cd frontend
 npm install
-npm run dev
+$env:VITE_API_BASE_URL="http://127.0.0.1:8800"
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-默认 SQLite 文件为 `D:\Codex\AgentFlow\data\agentflow\.db`。前端默认请求 `http://localhost:8000`，可通过 `VITE_API_BASE_URL` 覆盖。
+The default SQLite database is `data/agentflow/.db` relative to the repository root. The main API is available at `http://127.0.0.1:8800`; OpenAPI docs are at `/docs`.
 
-## API
+## API surface
 
-- `GET /health`
-- `POST /api/v1/executions`
-- `GET /api/v1/executions?page=1&page_size=20&status=succeeded`
-- `GET /api/v1/executions/{execution_id}`
-- `DELETE /api/v1/executions/{execution_id}`
-- `GET /docs`
+- `POST /api/v1/datasets/upload`
+- `POST /api/v1/datasets/{dataset_id}/import`
+- `GET /api/v1/datasets`
+- `GET /api/v1/datasets/{dataset_id}`
+- `GET /api/v1/datasets/{dataset_id}/records`
+- `DELETE /api/v1/datasets/{dataset_id}`
+- `POST /api/v1/executions` with `{ "user_request": "...", "dataset_id": 1 }`
+- `GET /api/v1/executions`, `GET /api/v1/executions/{execution_id}`
 
-未配置 LLM API Key 时，提交请求仍会生成一条失败执行记录，便于查询错误原因；真实模型调用需要先配置密钥。
+## Testing and acceptance
 
-## 测试
+The current acceptance run completed the non-HTTP backend suite with **163 passed**. Five HTTP health/API tests remain **BLOCKED** in the managed Windows environment because the local asyncio socket initialization used by the test client does not return; they are not reported as passing.
+
+The browser-level acceptance used [testdata/acceptance_sales.xlsx](testdata/acceptance_sales.xlsx): 6 rows imported, 0 failed rows, real DeepSeek Function Calling, SQLite queries, Python metrics, Markdown report generation, history lookup, and persistence after backend restart.
 
 ```powershell
-.venv\Scripts\python.exe -m pytest -v
+.venv\Scripts\python.exe -m pytest -q --ignore=tests/test_api.py --ignore=tests/test_health.py
+cd frontend
+npm run build
 ```
 
-测试使用临时 SQLite 数据库和 Fake/Mock LLM，不需要 API Key，也不会访问开发数据库。
+中文学习与开发说明见 [docs/PROJECT_LEARNING_LOG.md](docs/PROJECT_LEARNING_LOG.md)、[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) 和 [docs/INTERVIEW_QUESTIONS.md](docs/INTERVIEW_QUESTIONS.md)。
 
-## 当前限制
+## Current scope
 
-- 真实 DeepSeek API 联调需要用户配置密钥，本次自动化测试未验证外部网络调用。
-- 当前使用同步 FastAPI/SQLAlchemy；SQLite 适合本地 Demo，不适合高并发生产写入。
-- 前端是轻量单页界面，未引入身份认证、流式输出或实时 WebSocket。
-- 模拟销售数据范围有限，查询范围必须覆盖已有记录。
+AgentFlow is designed for local, auditable analytics workflows. It does not yet include authentication, multi-tenant authorization, streaming responses, or a production-scale asynchronous database layer.

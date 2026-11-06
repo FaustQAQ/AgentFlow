@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import select
+from app.models.sales import SalesDatasetModel
 
 from app.db.database import get_db
 from app.schemas.history import ExecutionListResponse, ExecutionResponse
@@ -12,6 +14,7 @@ router = APIRouter(prefix="/api/v1/executions", tags=["executions"])
 
 class ExecutionCreateRequest(BaseModel):
     user_request: str = Field(min_length=1, max_length=10000)
+    dataset_id: int | None = Field(default=None, gt=0)
 
 
 def get_orchestrator() -> AgentOrchestrator:
@@ -27,8 +30,14 @@ def create_execution(
     agent: AgentOrchestrator = Depends(get_orchestrator),
 ) -> ExecutionResponse:
     try:
-        execution = agent.run(request.user_request)
+        if request.dataset_id is None:
+            raise HTTPException(status_code=400, detail="请先上传并选择销售数据集")
+        if db.scalar(select(SalesDatasetModel.id).where(SalesDatasetModel.id == request.dataset_id)) is None:
+            raise HTTPException(status_code=404, detail="指定数据集不存在")
+        execution = agent.run(request.user_request, request.dataset_id)
         return ExecutionQueryService().get_execution(db, str(execution.execution_id))
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

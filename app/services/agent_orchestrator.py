@@ -42,12 +42,12 @@ class AgentOrchestrator:
         self.max_rounds = max_rounds
         self.max_tool_calls = max_tool_calls
 
-    def run(self, user_request: str) -> AgentExecution:
-        execution = AgentExecution(user_request=user_request)
+    def run(self, user_request: str, dataset_id: int | None = None) -> AgentExecution:
+        execution = AgentExecution(user_request=user_request, dataset_id=dataset_id)
         execution.status = ExecutionStatus.RUNNING
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_request},
+            {"role": "user", "content": f"当前数据集 ID: {dataset_id}\n{user_request}" if dataset_id else user_request},
         ]
         tool_call_count = 0
 
@@ -74,7 +74,7 @@ class AgentOrchestrator:
                             arguments=call.arguments,
                         )
                         for call in response.tool_calls
-                    ],
+                    ], dataset_id=dataset_id,
                 )
                 for step in round_result.steps:
                     step.execution_id = execution.execution_id

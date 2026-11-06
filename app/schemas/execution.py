@@ -50,6 +50,7 @@ class ExecutionStep(BaseModel):
 class AgentExecution(BaseModel):
     execution_id: UUID = Field(default_factory=uuid4)
     user_request: str = Field(min_length=1)
+    dataset_id: int | None = None
     status: ExecutionStatus = ExecutionStatus.PENDING
     steps: list[ExecutionStep] = Field(default_factory=list)
     final_output: str | None = None

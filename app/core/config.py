@@ -9,7 +9,7 @@ DEFAULT_DATABASE_URL = f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
 
 
 class Settings(BaseSettings):
-    app_name: str = "AgentFlow"
+    app_name: str = "AgentFlow — 智能销售数据分析 Agent 平台"
     app_env: str = "development"
     debug: bool = True
     llm_provider: str = "deepseek"
